@@ -20,7 +20,7 @@ function buildGridFromClues(clues: CrosswordPuzzle["clues"]): string[][] {
     answer: string,
     row: number,
     col: number,
-    direction: ClueDirection,
+    direction: "across" | "down",
     number: number
   ) => {
     for (let i = 0; i < answer.length; i++) {
@@ -29,10 +29,19 @@ function buildGridFromClues(clues: CrosswordPuzzle["clues"]): string[][] {
 
       if (r >= 10 || c >= 10) continue
 
-      if (i === 0 && grid[r][c] === "") {
+      const current = grid[r][c]
+
+      // Place clue number only if it's the first cell and cell is empty
+      if (i === 0 && current === "") {
         grid[r][c] = number.toString()
-      } else if (!/^\d+$/.test(grid[r][c])) {
+      } else if (current === "") {
         grid[r][c] = answer[i]
+      } else if (/^\d+$/.test(current)) {
+        // Convert number cell into letter with number preserved
+        grid[r][c] = answer[i] // Number will still render from clue object
+      } else if (current !== answer[i]) {
+        console.warn(`Conflict at (${r},${c}): grid='${current}' vs word='${answer[i]}'`)
+        // Optional: throw or overwrite, but be aware of this
       }
     }
   }
@@ -47,6 +56,7 @@ function buildGridFromClues(clues: CrosswordPuzzle["clues"]): string[][] {
 
   return grid
 }
+
 
 export default function CrosswordGame() {
   const [puzzle, setPuzzle] = useState<CrosswordPuzzle | null>(null)
