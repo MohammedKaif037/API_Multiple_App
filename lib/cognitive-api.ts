@@ -110,6 +110,69 @@ export class CognitiveAPI {
     })
   }
 
+  // Helper function to build crossword grid from clues
+  private buildCrosswordGrid(clues: any): string[][] {
+    console.log("🔧 Building crossword grid from clues:", clues)
+
+    // Initialize 10x10 grid with empty strings
+    const grid: string[][] = Array(10)
+      .fill(null)
+      .map(() => Array(10).fill(""))
+
+    // Place across words
+    clues.across.forEach((clue: any) => {
+      const answer = clue.answer.toUpperCase()
+      console.log(`📝 Placing ACROSS word "${answer}" at row ${clue.startRow}, col ${clue.startCol}`)
+
+      // Place the number in the first cell
+      if (grid[clue.startRow] && grid[clue.startRow][clue.startCol] !== undefined) {
+        grid[clue.startRow][clue.startCol] = clue.number.toString()
+      }
+
+      // Place the letters
+      for (let i = 0; i < answer.length; i++) {
+        const col = clue.startCol + i
+        if (col < 10 && grid[clue.startRow]) {
+          // If it's the first letter and no number is placed, place the number
+          if (i === 0 && grid[clue.startRow][col] === "") {
+            grid[clue.startRow][col] = clue.number.toString()
+          } else if (i > 0) {
+            // Place the letter (not the first position which has the number)
+            grid[clue.startRow][col] = answer[i]
+          }
+        }
+      }
+    })
+
+    // Place down words
+    clues.down.forEach((clue: any) => {
+      const answer = clue.answer.toUpperCase()
+      console.log(`📝 Placing DOWN word "${answer}" at row ${clue.startRow}, col ${clue.startCol}`)
+
+      // Place the number in the first cell if it's empty
+      if (grid[clue.startRow] && grid[clue.startRow][clue.startCol] === "") {
+        grid[clue.startRow][clue.startCol] = clue.number.toString()
+      }
+
+      // Place the letters
+      for (let i = 0; i < answer.length; i++) {
+        const row = clue.startRow + i
+        if (row < 10 && grid[row]) {
+          // If it's the first letter and no number is placed, place the number
+          if (i === 0 && grid[row][clue.startCol] === "") {
+            grid[row][clue.startCol] = clue.number.toString()
+          } else if (i > 0) {
+            // Place the letter (not the first position which has the number)
+            grid[row][clue.startCol] = answer[i]
+          }
+        }
+      }
+    })
+
+    console.log("🎯 Final built grid:", grid)
+    return grid
+  }
+
   // Generate crossword puzzle using OpenAI
   async generateCrossword(theme: string, difficulty: number): Promise<APIResponse<CrosswordPuzzle>> {
     try {
@@ -117,12 +180,18 @@ export class CognitiveAPI {
 
       const prompt = `Generate a ${difficulty === 1 ? "easy" : difficulty === 2 ? "medium" : "hard"} crossword puzzle with theme "${theme}". 
       Return a JSON object with:
-      - grid: 10x10 array of letters (empty cells as "")
       - clues: {across: [{number, clue, answer, startRow, startCol}], down: [{number, clue, answer, startRow, startCol}]}
       - difficulty: ${difficulty}
       - theme: "${theme}"
       
-      Include 8-12 words total. Make clues challenging but fair.`
+      Make sure:
+      - Include 5-8 words total for easy difficulty
+      - Answers should be uppercase
+      - startRow and startCol should be valid positions (0-9)
+      - Words should fit within a 10x10 grid
+      - Make clues challenging but fair
+      
+      Do NOT include a grid array - I will build it from the clues.`
 
       console.log("📤 Sending prompt to ChatAnywhere API:", prompt)
 
@@ -142,9 +211,15 @@ export class CognitiveAPI {
           const puzzleData = JSON.parse(content)
           console.log("✅ Parsed puzzle data:", puzzleData)
 
+          // Build the grid from the clues
+          const grid = this.buildCrosswordGrid(puzzleData.clues)
+
           const crossword: CrosswordPuzzle = {
             id: `crossword_${Date.now()}`,
-            ...puzzleData,
+            grid: grid,
+            clues: puzzleData.clues,
+            difficulty: puzzleData.difficulty,
+            theme: puzzleData.theme,
           }
           console.log("🎮 Final crossword object:", crossword)
           return { success: true, data: crossword }
