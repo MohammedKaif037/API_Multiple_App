@@ -22,34 +22,34 @@ export default function CrosswordGame() {
   const [gameCompleted, setGameCompleted] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // Enhanced crossword data
+  // Enhanced crossword data with proper grid layout
   const crosswordData: CrosswordPuzzle = {
     id: "crossword_1",
     grid: [
-      ["E", "L", "E", "P", "H", "A", "N", "T", "", ""],
-      ["", "", "", "", "", "", "", "R", "", ""],
-      ["", "B", "E", "E", "", "", "", "E", "", ""],
-      ["", "", "", "", "", "", "", "E", "", ""],
+      ["1", "E", "L", "E", "P", "H", "A", "N", "T", ""],
+      ["", "", "", "2", "", "", "", "", "3", ""],
+      ["", "", "", "G", "", "", "", "", "R", ""],
+      ["", "", "", "G", "", "", "", "", "E", ""],
+      ["4", "A", "P", "P", "L", "E", "", "", "E", ""],
       ["", "", "", "", "", "", "", "", "", ""],
-      ["", "", "", "", "A", "P", "P", "L", "E", ""],
-      ["", "", "", "", "", "", "", "", "", ""],
+      ["5", "B", "E", "E", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
     ],
     clues: {
       across: [
-        { number: 1, clue: "Large gray mammal with trunk", answer: "ELEPHANT", startRow: 0, startCol: 0 },
-        { number: 3, clue: "Flying insect that makes honey", answer: "BEE", startRow: 2, startCol: 1 },
-        { number: 5, clue: "Red fruit that grows on trees", answer: "APPLE", startRow: 5, startCol: 4 },
+        { number: 1, clue: "Large gray mammal with trunk", answer: "ELEPHANT", startRow: 0, startCol: 1 },
+        { number: 4, clue: "Red fruit that grows on trees", answer: "APPLE", startRow: 4, startCol: 1 },
+        { number: 5, clue: "Flying insect that makes honey", answer: "BEE", startRow: 6, startCol: 1 },
       ],
       down: [
-        { number: 2, clue: "Tall plant with leaves", answer: "TREE", startRow: 0, startCol: 7 },
-        { number: 4, clue: "Breakfast food from chickens", answer: "EGG", startRow: 0, startCol: 0 },
+        { number: 2, clue: "Breakfast food from chickens", answer: "EGG", startRow: 1, startCol: 3 },
+        { number: 3, clue: "Tall plant with leaves", answer: "TREE", startRow: 1, startCol: 8 },
       ],
     },
     difficulty: 2,
-    theme: "animals",
+    theme: "general",
   }
 
   useEffect(() => {
@@ -285,17 +285,27 @@ export default function CrosswordGame() {
                     row.map((cell, colIndex) => {
                       const key = `${rowIndex}-${colIndex}`
                       const isBlack = cell === ""
+                      const isNumberCell = /^\d+$/.test(cell)
+                      const cellNumber = isNumberCell ? cell : ""
+
                       return (
                         <div key={key} className="relative">
                           {isBlack ? (
                             <div className="w-8 h-8 bg-gray-800" />
                           ) : (
-                            <Input
-                              className="w-8 h-8 text-center text-sm font-bold p-0 border-2 border-gray-300"
-                              maxLength={1}
-                              value={userAnswers[key] || ""}
-                              onChange={(e) => handleCellInput(rowIndex, colIndex, e.target.value)}
-                            />
+                            <div className="relative">
+                              <Input
+                                className="w-8 h-8 text-center text-sm font-bold p-0 border-2 border-gray-300"
+                                maxLength={1}
+                                value={userAnswers[key] || ""}
+                                onChange={(e) => handleCellInput(rowIndex, colIndex, e.target.value)}
+                              />
+                              {cellNumber && (
+                                <span className="absolute top-0 left-0 text-xs font-bold text-blue-600 bg-white px-1 leading-none">
+                                  {cellNumber}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       )
