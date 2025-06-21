@@ -358,7 +358,96 @@ export default function CrosswordGame() {
       ) : (
         <div className="mt-10 text-center">
           {/* You already have rendering code for the puzzle grid and clues in your original component */}
-          <p className="text-lg">Puzzle Loaded!</p>
+<div className="flex flex-col items-center gap-6">
+  <div className="flex justify-between w-full max-w-5xl">
+    <div>
+      <p className="font-medium">⏱️ Time: {formatTime(timeElapsed)}</p>
+      <p className="font-medium">💯 Score: {score}</p>
+      <p className="font-medium">💡 Hints Used: {hintsUsed}/{maxHints}</p>
+    </div>
+    <div className="flex gap-2">
+      <Button variant="outline" onClick={checkAnswers}><Check className="mr-1 h-4 w-4" /> Check</Button>
+      <Button variant="outline" onClick={revealLetter} disabled={hintsUsed >= maxHints}><Lightbulb className="mr-1 h-4 w-4" /> Hint</Button>
+      <Button variant="destructive" onClick={resetGame}><RotateCcw className="mr-1 h-4 w-4" /> Reset</Button>
+    </div>
+  </div>
+
+  {/* Crossword Grid */}
+  <div className="grid grid-cols-10 gap-1">
+    {puzzle?.grid.map((row, r) =>
+      row.map((cell, c) => {
+        const key = `${r}-${c}`
+        const isFilled = cell !== ""
+        const isCorrect = correctCells[key]
+        const isFocused = focusedCell === key
+        const borderColor = isFocused ? "border-blue-500" : "border-gray-300"
+
+        return (
+          <div key={key} className={`w-10 h-10 border ${borderColor} flex items-center justify-center bg-white relative`}>
+            {isFilled ? (
+              <>
+                {/^\d+$/.test(cell) && (
+                  <span className="absolute top-0 left-0 text-xs text-gray-500 ml-0.5 mt-0.5">{cell}</span>
+                )}
+                <Input
+                  className={`text-center p-0 h-full w-full text-lg font-semibold ${isCorrect === false ? "text-red-500" : ""}`}
+                  maxLength={1}
+                  value={userAnswers[key] || ""}
+                  onChange={(e) => handleCellInput(r, c, e.target.value)}
+                  onFocus={() => setFocusedCell(key)}
+                  onKeyDown={(e) => handleKeyDown(e, r, c)}
+                  ref={(el) => { if (el) inputRefs.current[key] = el }}
+                />
+              </>
+            ) : (
+              <div className="w-full h-full bg-gray-800" />
+            )}
+          </div>
+        )
+      })
+    )}
+  </div>
+
+  {/* Clues */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl mt-4">
+    {(["across", "down"] as ClueDirection[]).map((direction) => (
+      <div key={direction}>
+        <h3 className="text-lg font-semibold capitalize mb-2">{direction} Clues</h3>
+        <ul className="space-y-1">
+          {puzzle?.clues[direction].map((clue) => {
+            const clueId = `${direction}-${clue.number}`
+            const isSelected = selectedClue === clueId
+            return (
+              <li
+                key={clueId}
+                className={`cursor-pointer p-2 rounded ${isSelected ? "bg-blue-100" : "hover:bg-gray-100"}`}
+                onClick={() => {
+                  setSelectedClue(clueId)
+                  const coords = getClueCoordinates(clue, direction)
+                  if (coords.length) setFocusedCell(coords[0])
+                }}
+              >
+                <strong>{clue.number}.</strong> {clue.clue}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    ))}
+  </div>
+
+  {gameCompleted && (
+    <div className="mt-6 text-center">
+      <Trophy className="mx-auto text-yellow-500" size={40} />
+      <h2 className="text-2xl font-bold mt-2">🎉 Congratulations! You completed the puzzle!</h2>
+      <p className="text-sm mt-1">Final Score: {score} | Time: {formatTime(timeElapsed)}</p>
+    </div>
+  )}
+
+  <Link href="/games" className="mt-6 inline-flex items-center text-blue-600 hover:underline text-sm">
+    <ArrowLeft className="mr-1 h-4 w-4" /> Back to Games
+  </Link>
+</div>
         </div>
       )}
     </div>
