@@ -106,6 +106,7 @@ export class CognitiveAPI {
     this.client = new OpenAI({
       apiKey: apiKey,
       baseURL: baseURL,
+      dangerouslyAllowBrowser: true, // Allow browser usage
     })
   }
 
@@ -422,5 +423,5 @@ export class CognitiveAPI {
 // Export a default instance (you can configure this with your actual API key)
 export const cognitiveAPI = new CognitiveAPI(
   process.env.NEXT_PUBLIC_CHATANYWHERE_API_KEY || "demo-key",
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.chatanywhere.com",
+  "https://api.chatanywhere.tech/v1",
 )
