@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
-   SelectContent,
-   SelectItem,
-   SelectTrigger,
-   SelectValue,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
   ArrowLeft,
@@ -19,13 +19,9 @@ import {
   Lightbulb,
   Trophy,
   QuestionCircle,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import Link from "next/link";
 import { cognitiveAPI, type CrosswordPuzzle } from "@/lib/cognitive-api";
-import sound effects
-import useSound from "use-sound";
 
 export default function CrosswordGame() {
   const [puzzle, setPuzzle] = useState<CrosswordPuzzle | null>(null);
@@ -39,18 +35,12 @@ export default function CrosswordGame() {
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
-  const [loading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [cellStatus, setCellStatus] = useState<Record<string, "correct" | "incorrect" | null>>({});
   const gridRefs = useRef<(HTMLInputElement | null)[][]>([]);
 
-  //Sound effects
-  const [playCorrect] = useSound("/sounds/correct.mp3", { volume: 0.5 });
-  const [playIncorrect] = useSound("/sounds/incorrect.mp3", { volume: 0.5 });
-  const [playClick] = useSound("/sounds/click.mp3", { volume: 0.3 });
-
-  //Default puzzle
+  // Default puzzle
   const crosswordData: CrosswordPuzzle = {
     id: "crossword_1",
     grid: [
@@ -80,12 +70,12 @@ export default function CrosswordGame() {
     theme: "general",
   };
 
-  //Initialize grid refs
+  // Initialize grid refs
   useEffect(() => {
     gridRefs.current = puzzle?.grid.map((row) => row.map(() => null)) || [];
   }, [puzzle]);
 
-  //Timer
+  // Timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (gameStarted && !gameCompleted) {
@@ -96,7 +86,7 @@ export default function CrosswordGame() {
     return () => clearInterval(interval);
   }, [gameStarted, gameCompleted]);
 
-  //Load saved progress
+  // Load saved progress
   useEffect(() => {
     const saved = localStorage.getItem("crosswordProgress");
     if (saved) {
@@ -108,7 +98,7 @@ export default function CrosswordGame() {
     }
   }, []);
 
-  //Save progress
+  // Save progress
   useEffect(() => {
     if (gameStarted) {
       localStorage.setItem(
@@ -124,7 +114,7 @@ export default function CrosswordGame() {
   }, [userAnswers, timeElapsed, score, hintsUsed, gameStarted]);
 
   const startGame = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
       const response = await cognitiveAPI.generateCrossword(theme, difficulty);
       if (response.success && response.data) {
@@ -137,7 +127,7 @@ export default function CrosswordGame() {
       setPuzzle(crosswordData);
       resetGameState();
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -156,13 +146,12 @@ export default function CrosswordGame() {
 
   const handleCellClick = (row: number, col: number) => {
     if (puzzle?.grid[row][col] === "") return;
-    if (soundEnabled) playClick();
     
     const newDirection = selectedCell?.row === row && selectedCell?.col === col ? (direction === "across" ? "down" : "across") : direction;
     setDirection(newDirection);
     setSelectedCell({ row, col });
 
-    //Find corresponding clue
+    // Find corresponding clue
     const clue = findClueForCell(row, col, newDirection);
     if (clue) {
       setSelectedClue({ type: newDirection, number: clue.number });
@@ -199,7 +188,7 @@ export default function CrosswordGame() {
       [key]: newValue,
     }));
 
-    //Move to next cell
+    // Move to next cell
     if (newValue && selectedCell) {
       moveToNextCell(row, col);
     }
@@ -336,7 +325,6 @@ export default function CrosswordGame() {
   };
 
   const handleClueClick = (type: "across" | "down", number: number) => {
-    if (soundEnabled) playClick();
     setSelectedClue({ type, number });
     
     const clue = puzzle?.clues[type].find((c) => c.number === number);
@@ -354,7 +342,7 @@ export default function CrosswordGame() {
     let totalAnswers = 0;
     const newCellStatus: Record<string, "correct" | "incorrect" | null> = {};
 
-    //Check across
+    // Check across
     puzzle.clues.across.forEach((clue) => {
       let isCorrect = true;
       for (let i = 0; i < clue.answer.length; i++) {
@@ -367,7 +355,7 @@ export default function CrosswordGame() {
       totalAnswers++;
     });
 
-    //Check down
+    // Check down
     puzzle.clues.down.forEach((clue) => {
       let isCorrect = true;
       for (let i = 0; i < clue.answer.length; i++) {
@@ -383,10 +371,6 @@ export default function CrosswordGame() {
     setCellStatus(newCellStatus);
     const newScore = Math.round((correctAnswers / totalAnswers) * 100);
     setScore(newScore);
-
-    if (soundEnabled) {
-      newScore > score ? playCorrect() : playIncorrect();
-    }
 
     if (correctAnswers === totalAnswers) {
       setGameCompleted(true);
@@ -438,7 +422,6 @@ export default function CrosswordGame() {
         [key]: clue.answer[emptyCellIndex],
       }));
       setHintsUsed((prev) => prev + 1);
-      if (soundEnabled) playCorrect();
     }
   };
 
@@ -451,6 +434,27 @@ export default function CrosswordGame() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const isCellHighlighted = (row: number, col: number) => {
+    if (!puzzle || !selectedClue) return false;
+    const clue = puzzle.clues[selectedClue.type].find(
+      (c) => c.number === selectedClue.number
+    );
+    if (!clue) return false;
+
+    if (selectedClue.type === "across") {
+      return (
+        row === clue.startRow &&
+        col >= clue.startCol &&
+        col < clue.startCol + clue.answer.length
+      );
+    }
+    return (
+      col === clue.startCol &&
+      row >= clue.startRow &&
+      row < clue.startRow + clue.answer.length
+    );
   };
 
   if (!gameStarted) {
@@ -541,18 +545,6 @@ export default function CrosswordGame() {
             <Badge variant="outline">Score: {score}%</Badge>
             <Badge>Difficulty: {difficulty}/3</Badge>
             <Badge>Hints: {3 - hintsUsed}/3</Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              aria-label={soundEnabled ? "Disable sound" : "Enable sound"}
-            >
-              {soundEnabled ? (
-                <Volume2 className="h-5 w-5" />
-              ) : (
-                <VolumeX className="h-5 w-5" />
-              )}
-            </Button>
           </div>
         </div>
 
@@ -615,7 +607,7 @@ export default function CrosswordGame() {
                       const isSelected =
                         selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
                       const isHighlighted = isCellHighlighted(rowIndex, colIndex);
-                      const cellStatus = cellStatus[key];
+                      const status = cellStatus[key];
 
                       return (
                         <div key={key} className="relative select-none">
@@ -625,23 +617,18 @@ export default function CrosswordGame() {
                             <div className="relative">
                               <input
                                 ref={(el) => (gridRefs.current[rowIndex][colIndex] = el)}
-                                className={`w-7 h-7 sm:w-8 sm:h-8 text-center text-sm font-semibold p-0 border-2 border-gray-300 rounded-sm
-                                ${isSelected ? "bg-blue-100 border-blue-400" : ""}
-                                ${isHighlighted ? "bg-yellow-50" : ""}
-                                ${
-                                  cellStatus === "correct"
-                                  ? "bg-green-50"
-                                  : "cellStatus" === "incorrect"
-                                  ? "bg-red-50"
-                                    : ""
-                                } 
-                                focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-100"}
+                                className={`w-7 h-7 sm:w-8 sm:h-8 text-center text-sm font-semibold p-0 border-2 rounded-sm
+                                  ${isSelected ? "bg-blue-100 border-blue-400" : "border-gray-300"}
+                                  ${isHighlighted ? "bg-yellow-50" : ""}
+                                  ${status === "correct" ? "bg-green-50" : ""}
+                                  ${status === "incorrect" ? "bg-red-50" : ""}
+                                  focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-100`}
                                 maxLength={1}
-                                value={userAnswers[key] || [] ""}
+                                value={userAnswers[key] || ""}
                                 onChange={(e) => handleCellInput(rowIndex, colIndex, e.target.value)}
                                 onClick={() => handleCellClick(rowIndex, colIndex)}
                                 onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                                aria-label={`Cell ${rowIndex + 1}, ${colIndex + 1}
+                                aria-label={`Cell ${rowIndex + 1}, ${colIndex + 1}`}
                                 disabled={gameCompleted}
                               />
                               {cellNumber && (
@@ -654,7 +641,6 @@ export default function CrosswordGame() {
                         </div>
                       );
                     })
-                    )
                   )}
                 </div>
               </CardContent>
@@ -669,97 +655,87 @@ export default function CrosswordGame() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-0 sm:space-y-2">
-                  {puzzle.clues.across.map((clue) => (
-                    const isSelectedClue = (
-                      selectedClue?.type === "across" && selectedClue?.number === clue.number
-                    );
-                      return (
-                        <div
-                          key={`across-${clue.number}`}
-                          className={`p-2 sm:p-3 rounded-lg border transition-colors duration-200 cursor-pointer
-                            ${
-                              isSelectedClue
-                              ? "bg-blue-50 border-blue-200"
-                              : "hover:bg-gray-50"
-                            } 
-                            `}
-                            onClick={() => handleClueClick("across", clue.number)}
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs shrink-0 {clue.number}>
-                                </Badge>
-                              <p className="text-sm">{clue.clue}</p>
-                            </div>
-                            <p
-                              className="text-xs text-gray-500 shrink-0"
-                            >
-                              ({clue.answer.length} letters)
-                            </p>
+                  {puzzle.clues.across.map((clue) => {
+                    const isSelectedClue =
+                      selectedClue?.type === "across" && selectedClue?.number === clue.number;
+                    return (
+                      <div
+                        key={`across-${clue.number}`}
+                        className={`p-2 sm:p-3 rounded-lg border transition-colors duration-200 cursor-pointer
+                          ${isSelectedClue ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"}`}
+                        onClick={() => handleClueClick("across", clue.number)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {clue.number}
+                            </Badge>
+                            <p className="text-sm">{clue.clue}</p>
                           </div>
+                          <p className="text-xs text-gray-500 shrink-0">
+                            ({clue.answer.length} letters)
+                          </p>
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-              <CardTitle className="text-lg">Down</CardTitle>
-              </CardContent>
-                <CardContent className="space-y-0 sm:space-y-2">
-                  <div className="space-y">
-                    {puzzle.clues.down.map((clue) => (
-                      const isSelectedClue = (
-                        {selectedClue?.type === "down" && selectedClue?.number === clue.number}
-                      );
-                      return (
-                        <div
-                          key={`down-${clue.number}`}
-                          className={`p-2 sm:p-3 rounded-lg border transition-colors duration-200 cursor-pointer
-                            ${isSelectedClue ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"}
-                            }`}
-                          onClick={() => handleClueClick("down", clue.number)}
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <div className="Badge" variant="outline" className="text-xs shrink-0">
-                                {clue.number}
-                              </Badge>
-                              <p className="text-sm">{clue.clue}</p>
-                            </div>
-                            <p className="text-xs text-gray-500 shrink-0">
-                              ({clue.answer.length} letters)
-                            </p>
+                <CardTitle className="text-lg">Down</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-0 sm:space-y-2">
+                  {puzzle.clues.down.map((clue) => {
+                    const isSelectedClue =
+                      selectedClue?.type === "down" && selectedClue?.number === clue.number;
+                    return (
+                      <div
+                        key={`down-${clue.number}`}
+                        className={`p-2 sm:p-3 rounded-lg border transition-colors duration-200 cursor-pointer
+                          ${isSelectedClue ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"}`}
+                        onClick={() => handleClueClick("down", clue.number)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {clue.number}
+                            </Badge>
+                            <p className="text-sm">{clue.clue}</p>
                           </div>
+                          <p className="text-xs text-gray-500 shrink-0">
+                            ({clue.answer.length} letters)
+                          </p>
                         </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Lightbulb className="h-5 w-5" />
-                      Tips
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="text-sm space-y-2 text-gray-600">
-                      <li key="text">• Use arrow keys to move between cells</li>
-                      <li key="text">• Click a clue or cell to highlight it</li>
-                      <li key="text">• Double-click a cell to switch direction</li>
-                      <li key="text">• Use hints when stuck (3 max)</li>
-                    </ul>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5" />
+                  Tips
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="text-sm space-y-2 text-gray-600">
+                  <li>• Use arrow keys to move between cells</li>
+                  <li>• Click a clue or cell to highlight it</li>
+                  <li>• Double-click a cell to switch direction</li>
+                  <li>• Use hints when stuck (3 max)</li>
+                </ul>
+              </CardContent>
+            </Card>
           </div>
+        </div>
+      </div>
+    </div>
   );
-};
+}
