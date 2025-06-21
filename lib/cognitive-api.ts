@@ -152,18 +152,25 @@ export class CognitiveAPI {
   private getMockCrossword(theme: string, difficulty: number): APIResponse<CrosswordPuzzle> {
     const mockCrossword: CrosswordPuzzle = {
       id: `crossword_${Date.now()}`,
-      grid: Array(10)
-        .fill(null)
-        .map(() => Array(10).fill("")),
+      grid: [
+        ["1", "C", "A", "T", "", "", "", "", "", ""],
+        ["", "", "", "2", "", "", "", "", "", ""],
+        ["", "", "", "R", "", "", "", "", "", ""],
+        ["3", "D", "O", "G", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", "", ""],
+        ["4", "B", "I", "R", "D", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", "", ""],
+      ],
       clues: {
         across: [
-          { number: 1, clue: "Large mammal", answer: "ELEPHANT", startRow: 0, startCol: 0 },
-          { number: 3, clue: "Flying insect", answer: "BEE", startRow: 2, startCol: 1 },
+          { number: 1, clue: "Feline pet", answer: "CAT", startRow: 0, startCol: 1 },
+          { number: 3, clue: "Man's best friend", answer: "DOG", startRow: 3, startCol: 1 },
+          { number: 4, clue: "Flying animal with feathers", answer: "BIRD", startRow: 5, startCol: 1 },
         ],
-        down: [
-          { number: 1, clue: "Breakfast food", answer: "EGG", startRow: 0, startCol: 0 },
-          { number: 2, clue: "Tree fruit", answer: "APPLE", startRow: 1, startCol: 4 },
-        ],
+        down: [{ number: 2, clue: "Grows from seeds", answer: "TREE", startRow: 1, startCol: 3 }],
       },
       difficulty,
       theme,
