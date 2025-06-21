@@ -113,6 +113,8 @@ export class CognitiveAPI {
   // Generate crossword puzzle using OpenAI
   async generateCrossword(theme: string, difficulty: number): Promise<APIResponse<CrosswordPuzzle>> {
     try {
+      console.log("🎯 Generating crossword with:", { theme, difficulty })
+
       const prompt = `Generate a ${difficulty === 1 ? "easy" : difficulty === 2 ? "medium" : "hard"} crossword puzzle with theme "${theme}". 
       Return a JSON object with:
       - grid: 10x10 array of letters (empty cells as "")
@@ -122,34 +124,50 @@ export class CognitiveAPI {
       
       Include 8-12 words total. Make clues challenging but fair.`
 
+      console.log("📤 Sending prompt to ChatAnywhere API:", prompt)
+
       const response = await this.client.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       })
 
+      console.log("📥 Raw API response:", response)
+      console.log("📝 Response content:", response.choices[0]?.message?.content)
+
       const content = response.choices[0]?.message?.content
       if (content) {
         try {
+          console.log("🔄 Attempting to parse JSON content...")
           const puzzleData = JSON.parse(content)
+          console.log("✅ Parsed puzzle data:", puzzleData)
+
           const crossword: CrosswordPuzzle = {
             id: `crossword_${Date.now()}`,
             ...puzzleData,
           }
+          console.log("🎮 Final crossword object:", crossword)
           return { success: true, data: crossword }
         } catch (parseError) {
+          console.error("❌ JSON parsing failed:", parseError)
+          console.log("🔄 Falling back to mock data")
           // Fallback to mock data if parsing fails
           return this.getMockCrossword(theme, difficulty)
         }
       }
 
+      console.log("⚠️ No content in response, using mock data")
       return this.getMockCrossword(theme, difficulty)
     } catch (error) {
+      console.error("💥 API call failed:", error)
+      console.log("🔄 Using mock data due to error")
       return this.getMockCrossword(theme, difficulty)
     }
   }
 
   private getMockCrossword(theme: string, difficulty: number): APIResponse<CrosswordPuzzle> {
+    console.log("🎲 Generating mock crossword with:", { theme, difficulty })
+
     const mockCrossword: CrosswordPuzzle = {
       id: `crossword_${Date.now()}`,
       grid: [
@@ -175,6 +193,8 @@ export class CognitiveAPI {
       difficulty,
       theme,
     }
+
+    console.log("🎲 Mock crossword generated:", mockCrossword)
     return { success: true, data: mockCrossword }
   }
 
