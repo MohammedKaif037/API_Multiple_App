@@ -1,19 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Check, RotateCcw, Lightbulb, Trophy } from "lucide-react"
-import Link from "next/link"
-import { cognitiveAPI, type CrosswordPuzzle } from "@/lib/cognitive-api"
+import { ArrowLeft, Check, RotateCcw, Lightbulb, Trophy, Eye, EyeOff } from "lucide-react"
 
-export default function CrosswordGame() {
-  const [puzzle, setPuzzle] = useState<CrosswordPuzzle | null>(null)
-  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({})
-  const [selectedClue, setSelectedClue] = useState<string | null>(null)
+export default function InteractiveCrossword() {
+  const [puzzle, setPuzzle] = useState(null)
+  const [userAnswers, setUserAnswers] = useState({})
+  const [selectedClue, setSelectedClue] = useState(null)
+  const [selectedCell, setSelectedCell] = useState(null)
+  const [direction, setDirection] = useState('across')
   const [difficulty, setDifficulty] = useState(2)
   const [theme, setTheme] = useState("general")
   const [score, setScore] = useState(0)
@@ -21,31 +21,34 @@ export default function CrosswordGame() {
   const [gameStarted, setGameStarted] = useState(false)
   const [gameCompleted, setGameCompleted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showAnswers, setShowAnswers] = useState(false)
+  const [currentWord, setCurrentWord] = useState(null)
+  const inputRefs = useRef({})
 
   // Enhanced crossword data with proper grid layout
-  const crosswordData: CrosswordPuzzle = {
+  const crosswordData = {
     id: "crossword_1",
     grid: [
-      ["1", "E", "L", "E", "P", "H", "A", "N", "T", ""],
+      ["", "1", "G", "E", "N", "E", "R", "A", "L", ""],
       ["", "", "", "2", "", "", "", "", "3", ""],
-      ["", "", "", "G", "", "", "", "", "R", ""],
+      ["", "", "", "G", "", "", "", "", "V", ""],
       ["", "", "", "G", "", "", "", "", "E", ""],
-      ["4", "A", "P", "P", "L", "E", "", "", "E", ""],
-      ["", "", "", "", "", "", "", "", "", ""],
-      ["5", "B", "E", "E", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", "", "", ""],
+      ["4", "C", "O", "M", "M", "O", "N", "", "R", ""],
+      ["", "", "", "", "", "", "", "", "A", ""],
+      ["5", "B", "R", "O", "A", "D", "", "", "L", ""],
+      ["", "", "", "", "", "", "", "", "L", ""],
       ["", "", "", "", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
     ],
     clues: {
       across: [
-        { number: 1, clue: "Large gray mammal with trunk", answer: "ELEPHANT", startRow: 0, startCol: 1 },
-        { number: 4, clue: "Red fruit that grows on trees", answer: "APPLE", startRow: 4, startCol: 1 },
-        { number: 5, clue: "Flying insect that makes honey", answer: "BEE", startRow: 6, startCol: 1 },
+        { number: 1, clue: "Opposite of specific (7 letters)", answer: "GENERAL", startRow: 0, startCol: 1 },
+        { number: 4, clue: "Commonplace (6 letters)", answer: "COMMON", startRow: 4, startCol: 1 },
+        { number: 5, clue: "Wide in scope (5 letters)", answer: "BROAD", startRow: 6, startCol: 1 },
       ],
       down: [
-        { number: 2, clue: "Breakfast food from chickens", answer: "EGG", startRow: 1, startCol: 3 },
-        { number: 3, clue: "Tall plant with leaves", answer: "TREE", startRow: 1, startCol: 8 },
+        { number: 2, clue: "Breakfast food from chickens (3 letters)", answer: "EGG", startRow: 1, startCol: 3 },
+        { number: 3, clue: "All-encompassing (7 letters)", answer: "OVERALL", startRow: 1, startCol: 8 },
       ],
     },
     difficulty: 2,
@@ -57,7 +60,7 @@ export default function CrosswordGame() {
   }, [])
 
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval
     if (gameStarted && !gameCompleted) {
       interval = setInterval(() => {
         setTimeElapsed((prev) => prev + 1)
@@ -69,18 +72,16 @@ export default function CrosswordGame() {
   const startGame = async () => {
     setLoading(true)
     try {
-      const response = await cognitiveAPI.generateCrossword(theme, difficulty)
-      if (response.success && response.data) {
-        setPuzzle(response.data)
-      } else {
-        // Use default puzzle if API fails
-        setPuzzle(crosswordData)
-      }
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setPuzzle(crosswordData)
       setGameStarted(true)
       setTimeElapsed(0)
       setScore(0)
       setUserAnswers({})
       setGameCompleted(false)
+      setSelectedCell(null)
+      setSelectedClue(null)
     } catch (error) {
       setPuzzle(crosswordData)
       setGameStarted(true)
@@ -89,12 +90,147 @@ export default function CrosswordGame() {
     }
   }
 
-  const handleCellInput = (row: number, col: number, value: string) => {
-    const key = `${row}-${col}`
-    setUserAnswers((prev) => ({
+  const getCellKey = (row, col) => `${row}-${col}`
+
+  const isCellInWord = (row, col, clue, clueDirection) => {
+    if (clueDirection === 'across') {
+      return row === clue.startRow && col >= clue.startCol && col < clue.startCol + clue.answer.length
+    } else {
+      return col === clue.startCol && row >= clue.startRow && row < clue.startRow + clue.answer.length
+    }
+  }
+
+  const getWordCells = (clue, clueDirection) => {
+    const cells = []
+    if (clueDirection === 'across') {
+      for (let i = 0; i < clue.answer.length; i++) {
+        cells.push({ row: clue.startRow, col: clue.startCol + i })
+      }
+    } else {
+      for (let i = 0; i < clue.answer.length; i++) {
+        cells.push({ row: clue.startRow + i, col: clue.startCol })
+      }
+    }
+    return cells
+  }
+
+  const handleCellClick = (row, col) => {
+    if (!puzzle || puzzle.grid[row][col] === "") return
+
+    setSelectedCell({ row, col })
+    
+    // Find which clue this cell belongs to
+    const acrossClue = puzzle.clues.across.find(clue => 
+      isCellInWord(row, col, clue, 'across')
+    )
+    const downClue = puzzle.clues.down.find(clue => 
+      isCellInWord(row, col, clue, 'down')
+    )
+
+    // If cell belongs to both across and down, toggle direction
+    if (acrossClue && downClue) {
+      if (selectedCell && selectedCell.row === row && selectedCell.col === col) {
+        setDirection(direction === 'across' ? 'down' : 'across')
+        setSelectedClue(direction === 'across' ? `down-${downClue.number}` : `across-${acrossClue.number}`)
+        setCurrentWord(direction === 'across' ? downClue : acrossClue)
+      } else {
+        setDirection('across')
+        setSelectedClue(`across-${acrossClue.number}`)
+        setCurrentWord(acrossClue)
+      }
+    } else if (acrossClue) {
+      setDirection('across')
+      setSelectedClue(`across-${acrossClue.number}`)
+      setCurrentWord(acrossClue)
+    } else if (downClue) {
+      setDirection('down')
+      setSelectedClue(`down-${downClue.number}`)
+      setCurrentWord(downClue)
+    }
+
+    // Focus the input
+    setTimeout(() => {
+      const inputElement = inputRefs.current[getCellKey(row, col)]
+      if (inputElement) {
+        inputElement.focus()
+      }
+    }, 0)
+  }
+
+  const handleCellInput = (row, col, value) => {
+    if (!value.match(/[A-Za-z]/)) return
+
+    const key = getCellKey(row, col)
+    const upperValue = value.toUpperCase()
+    
+    setUserAnswers(prev => ({
       ...prev,
-      [key]: value.toUpperCase(),
+      [key]: upperValue
     }))
+
+    // Move to next cell in current word
+    if (currentWord && value) {
+      const wordCells = getWordCells(currentWord, direction)
+      const currentIndex = wordCells.findIndex(cell => cell.row === row && cell.col === col)
+      
+      if (currentIndex >= 0 && currentIndex < wordCells.length - 1) {
+        const nextCell = wordCells[currentIndex + 1]
+        setSelectedCell(nextCell)
+        setTimeout(() => {
+          const nextInput = inputRefs.current[getCellKey(nextCell.row, nextCell.col)]
+          if (nextInput) {
+            nextInput.focus()
+          }
+        }, 0)
+      }
+    }
+  }
+
+  const handleKeyDown = (e, row, col) => {
+    if (e.key === 'Backspace' && !userAnswers[getCellKey(row, col)]) {
+      // Move to previous cell if current is empty
+      if (currentWord) {
+        const wordCells = getWordCells(currentWord, direction)
+        const currentIndex = wordCells.findIndex(cell => cell.row === row && cell.col === col)
+        
+        if (currentIndex > 0) {
+          const prevCell = wordCells[currentIndex - 1]
+          setSelectedCell(prevCell)
+          setTimeout(() => {
+            const prevInput = inputRefs.current[getCellKey(prevCell.row, prevCell.col)]
+            if (prevInput) {
+              prevInput.focus()
+            }
+          }, 0)
+        }
+      }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      let newRow = row, newCol = col
+      
+      if (e.key === 'ArrowLeft') newCol = Math.max(0, col - 1)
+      if (e.key === 'ArrowRight') newCol = Math.min(9, col + 1)
+      if (e.key === 'ArrowUp') newRow = Math.max(0, row - 1)
+      if (e.key === 'ArrowDown') newRow = Math.min(9, row + 1)
+      
+      if (puzzle.grid[newRow][newCol] !== "") {
+        handleCellClick(newRow, newCol)
+      }
+    }
+  }
+
+  const handleClueClick = (clue, clueDirection) => {
+    setSelectedClue(`${clueDirection}-${clue.number}`)
+    setCurrentWord(clue)
+    setDirection(clueDirection)
+    setSelectedCell({ row: clue.startRow, col: clue.startCol })
+    
+    setTimeout(() => {
+      const inputElement = inputRefs.current[getCellKey(clue.startRow, clue.startCol)]
+      if (inputElement) {
+        inputElement.focus()
+      }
+    }, 0)
   }
 
   const checkAnswers = () => {
@@ -107,7 +243,7 @@ export default function CrosswordGame() {
     puzzle.clues.across.forEach((clue) => {
       let isCorrect = true
       for (let i = 0; i < clue.answer.length; i++) {
-        const key = `${clue.startRow}-${clue.startCol + i}`
+        const key = getCellKey(clue.startRow, clue.startCol + i)
         if (userAnswers[key] !== clue.answer[i]) {
           isCorrect = false
           break
@@ -121,7 +257,7 @@ export default function CrosswordGame() {
     puzzle.clues.down.forEach((clue) => {
       let isCorrect = true
       for (let i = 0; i < clue.answer.length; i++) {
-        const key = `${clue.startRow + i}-${clue.startCol}`
+        const key = getCellKey(clue.startRow + i, clue.startCol)
         if (userAnswers[key] !== clue.answer[i]) {
           isCorrect = false
           break
@@ -136,15 +272,6 @@ export default function CrosswordGame() {
 
     if (correctAnswers === totalAnswers) {
       setGameCompleted(true)
-      // Track progress
-      cognitiveAPI.trackProgress({
-        date: new Date().toISOString(),
-        score: newScore,
-        gameType: "crossword",
-        difficulty,
-        timeSpent: timeElapsed,
-        cognitiveAreas: ["Language", "Memory", "Problem Solving"],
-      })
     }
   }
 
@@ -155,12 +282,37 @@ export default function CrosswordGame() {
     setGameStarted(false)
     setGameCompleted(false)
     setSelectedClue(null)
+    setSelectedCell(null)
+    setCurrentWord(null)
+    setShowAnswers(false)
   }
 
-  const formatTime = (seconds: number) => {
+  const toggleAnswers = () => {
+    setShowAnswers(!showAnswers)
+  }
+
+  const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const getCellClass = (row, col) => {
+    const baseClass = "w-8 h-8 text-center text-sm font-bold border-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    let classes = [baseClass]
+
+    const isSelected = selectedCell && selectedCell.row === row && selectedCell.col === col
+    const isInCurrentWord = currentWord && isCellInWord(row, col, currentWord, direction)
+    
+    if (isSelected) {
+      classes.push("bg-blue-200 border-blue-500")
+    } else if (isInCurrentWord) {
+      classes.push("bg-blue-100 border-blue-300")
+    } else {
+      classes.push("border-gray-300 hover:border-gray-400")
+    }
+
+    return classes.join(" ")
   }
 
   if (!gameStarted) {
@@ -168,13 +320,7 @@ export default function CrosswordGame() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
         <div className="max-w-4xl mx-auto p-6">
           <div className="mb-6">
-            <Button asChild variant="ghost" className="mb-4">
-              <Link href="/games/word-puzzles">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Word Puzzles
-              </Link>
-            </Button>
-            <h1 className="text-3xl font-bold text-gray-900">Crossword Puzzle</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Interactive Crossword Puzzle</h1>
             <p className="text-gray-600">Challenge your vocabulary and general knowledge</p>
           </div>
 
@@ -231,13 +377,8 @@ export default function CrosswordGame() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <Button asChild variant="ghost" className="mb-2">
-              <Link href="/games/word-puzzles">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Word Puzzles
-              </Link>
-            </Button>
-            <h1 className="text-2xl font-bold text-gray-900">Crossword Puzzle</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Interactive Crossword Puzzle</h1>
+            <p className="text-sm text-gray-600">Click on cells to select words, type to fill them in</p>
           </div>
           <div className="flex items-center gap-4">
             <Badge variant="outline">Time: {formatTime(timeElapsed)}</Badge>
@@ -273,6 +414,10 @@ export default function CrosswordGame() {
                     <Check className="h-4 w-4 mr-2" />
                     Check Answers
                   </Button>
+                  <Button onClick={toggleAnswers} variant="outline" size="sm">
+                    {showAnswers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                    {showAnswers ? "Hide" : "Show"} Answers
+                  </Button>
                   <Button onClick={resetGame} variant="outline" size="sm">
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Reset
@@ -283,7 +428,7 @@ export default function CrosswordGame() {
                 <div className="grid grid-cols-10 gap-1 max-w-lg mx-auto">
                   {puzzle.grid.map((row, rowIndex) =>
                     row.map((cell, colIndex) => {
-                      const key = `${rowIndex}-${colIndex}`
+                      const key = getCellKey(rowIndex, colIndex)
                       const isBlack = cell === ""
                       const isNumberCell = /^\d+$/.test(cell)
                       const cellNumber = isNumberCell ? cell : ""
@@ -294,14 +439,21 @@ export default function CrosswordGame() {
                             <div className="w-8 h-8 bg-gray-800" />
                           ) : (
                             <div className="relative">
-                              <Input
-                                className="w-8 h-8 text-center text-sm font-bold p-0 border-2 border-gray-300"
+                              <input
+                                ref={(el) => inputRefs.current[key] = el}
+                                className={getCellClass(rowIndex, colIndex)}
                                 maxLength={1}
-                                value={userAnswers[key] || ""}
-                                onChange={(e) => handleCellInput(rowIndex, colIndex, e.target.value)}
+                                value={showAnswers ? 
+                                  (isNumberCell ? "" : puzzle.grid[rowIndex][colIndex]) : 
+                                  (userAnswers[key] || "")
+                                }
+                                onChange={(e) => !showAnswers && handleCellInput(rowIndex, colIndex, e.target.value)}
+                                onClick={() => handleCellClick(rowIndex, colIndex)}
+                                onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                                readOnly={showAnswers}
                               />
                               {cellNumber && (
-                                <span className="absolute top-0 left-0 text-xs font-bold text-blue-600 bg-white px-1 leading-none">
+                                <span className="absolute top-0 left-0 text-xs font-bold text-blue-600 bg-white px-1 leading-none pointer-events-none">
                                   {cellNumber}
                                 </span>
                               )}
@@ -330,7 +482,7 @@ export default function CrosswordGame() {
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                         selectedClue === `across-${clue.number}` ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"
                       }`}
-                      onClick={() => setSelectedClue(`across-${clue.number}`)}
+                      onClick={() => handleClueClick(clue, 'across')}
                     >
                       <div className="flex items-start gap-2">
                         <Badge variant="outline" className="text-xs">
@@ -357,7 +509,7 @@ export default function CrosswordGame() {
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                         selectedClue === `down-${clue.number}` ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"
                       }`}
-                      onClick={() => setSelectedClue(`down-${clue.number}`)}
+                      onClick={() => handleClueClick(clue, 'down')}
                     >
                       <div className="flex items-start gap-2">
                         <Badge variant="outline" className="text-xs">
@@ -376,15 +528,18 @@ export default function CrosswordGame() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Lightbulb className="h-5 w-5" />
-                  Tips
+                  How to Play
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="text-sm space-y-2 text-gray-600">
-                  <li>• Click on a clue to highlight it</li>
-                  <li>• Fill in the easiest words first</li>
-                  <li>• Use crossing letters as hints</li>
-                  <li>• Check your answers frequently</li>
+                  <li>• Click on any cell to start filling a word</li>
+                  <li>• Click on clues to jump to that word</li>
+                  <li>• Use arrow keys to navigate between cells</li>
+                  <li>• Type letters to fill in your answers</li>
+                  <li>• Backspace moves to previous cell when empty</li>
+                  <li>• Selected word is highlighted in blue</li>
+                  <li>• Check answers to see your progress</li>
                 </ul>
               </CardContent>
             </Card>
