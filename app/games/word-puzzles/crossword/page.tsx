@@ -35,30 +35,27 @@ export default function CrosswordGame() {
   const crosswordData: CrosswordPuzzle = {
     id: "crossword_1",
     grid: [
-      ["1", "E", "L", "E", "P", "H", "A", "N", "T", ""],
-      ["", "", "", "2", "", "", "", "", "3", ""],
-      ["", "", "", "G", "", "", "", "", "R", ""],
-      ["", "", "", "G", "", "", "", "", "E", ""],
-      ["4", "A", "P", "P", "L", "E", "", "", "E", ""],
+      ["1", "C", "A", "T", "", "", "", "", "", ""],
+      ["", "", "", "2", "", "", "", "", "", ""],
+      ["", "", "", "R", "", "", "", "", "", ""],
+      ["", "", "", "E", "", "", "", "", "", ""],
+      ["", "", "", "E", "", "", "", "", "", ""],
+      ["3", "D", "O", "G", "", "4", "B", "I", "R", "D"],
       ["", "", "", "", "", "", "", "", "", ""],
-      ["5", "B", "E", "E", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
       ["", "", "", "", "", "", "", "", "", ""],
     ],
     clues: {
       across: [
-        { number: 1, clue: "Large gray mammal with trunk", answer: "ELEPHANT", startRow: 0, startCol: 1 },
-        { number: 4, clue: "Red fruit that grows on trees", answer: "APPLE", startRow: 4, startCol: 1 },
-        { number: 5, clue: "Flying insect that makes honey", answer: "BEE", startRow: 6, startCol: 1 },
+        { number: 1, clue: "Feline pet", answer: "CAT", startRow: 0, startCol: 1 },
+        { number: 3, clue: "Man's best friend", answer: "DOG", startRow: 5, startCol: 1 },
+        { number: 4, clue: "Flying animal with feathers", answer: "BIRD", startRow: 5, startCol: 6 },
       ],
-      down: [
-        { number: 2, clue: "Breakfast food from chickens", answer: "EGG", startRow: 1, startCol: 3 },
-        { number: 3, clue: "Tall plant with leaves", answer: "TREE", startRow: 1, startCol: 8 },
-      ],
+      down: [{ number: 2, clue: "Grows from seeds", answer: "TREE", startRow: 1, startCol: 3 }],
     },
     difficulty: 2,
-    theme: "general",
+    theme: "animals",
   }
 
   useEffect(() => {
@@ -515,11 +512,11 @@ export default function CrosswordGame() {
                       return (
                         <div key={key} className="relative">
                           {isBlack ? (
-                            <div className="w-8 h-8 bg-gray-800" />
+                            <div className="w-8 h-8 bg-gray-800 rounded-sm" />
                           ) : (
                             <div className="relative">
                               <Input
-                                className={`w-8 h-8 text-center text-sm font-bold p-0 border-2 ${
+                                className={`w-8 h-8 text-center text-sm font-bold p-0 border-2 bg-white ${
                                   isCorrect
                                     ? "border-green-500 bg-green-50"
                                     : isIncorrect
@@ -534,7 +531,7 @@ export default function CrosswordGame() {
                                 onFocus={() => setFocusedCell(key)}
                               />
                               {cellNumber && (
-                                <span className="absolute top-0 left-0 text-xs font-bold text-blue-600 bg-white px-1 leading-none">
+                                <span className="absolute top-0 left-0 text-[10px] font-bold text-blue-600 bg-white px-0.5 leading-none rounded-br-sm">
                                   {cellNumber}
                                 </span>
                               )}
