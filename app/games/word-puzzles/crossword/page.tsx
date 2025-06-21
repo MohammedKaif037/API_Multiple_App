@@ -70,25 +70,30 @@ export default function InteractiveCrossword() {
   }, [gameStarted, gameCompleted])
 
   const startGame = async () => {
-    setLoading(true)
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
+  setLoading(true)
+  try {
+    const response = await cognitiveAPI.generateCrossword(theme, difficulty)
+    if (response.success && response.data) {
+      setPuzzle(response.data)
+    } else {
       setPuzzle(crosswordData)
-      setGameStarted(true)
-      setTimeElapsed(0)
-      setScore(0)
-      setUserAnswers({})
-      setGameCompleted(false)
-      setSelectedCell(null)
-      setSelectedClue(null)
-    } catch (error) {
-      setPuzzle(crosswordData)
-      setGameStarted(true)
-    } finally {
-      setLoading(false)
     }
+
+    setGameStarted(true)
+    setTimeElapsed(0)
+    setScore(0)
+    setUserAnswers({})
+    setGameCompleted(false)
+    setSelectedCell(null)
+    setSelectedClue(null)
+  } catch (error) {
+    setPuzzle(crosswordData)
+    setGameStarted(true)
+  } finally {
+    setLoading(false)
   }
+}
+
 
   const getCellKey = (row, col) => `${row}-${col}`
 
