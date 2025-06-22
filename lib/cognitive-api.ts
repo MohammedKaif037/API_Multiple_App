@@ -111,7 +111,7 @@ export class CognitiveAPI {
   }
 
   // Helper function to build crossword grid from clues
-  private buildCrosswordGrid(clues: any): string[][] {
+  private buildCrosswordGrid(clues: CrosswordPuzzle["clues"]): string[][] {
     console.log("🔧 Building crossword grid from clues:", clues)
 
     // Initialize 10x10 grid with empty strings
@@ -119,55 +119,65 @@ export class CognitiveAPI {
       .fill(null)
       .map(() => Array(10).fill(""))
 
-    // Place across words
-    clues.across.forEach((clue: any) => {
-      const answer = clue.answer.toUpperCase()
-      console.log(`📝 Placing ACROSS word "${answer}" at row ${clue.startRow}, col ${clue.startCol}`)
-
-      // Place the number in the first cell
-      if (grid[clue.startRow] && grid[clue.startRow][clue.startCol] !== undefined) {
-        grid[clue.startRow][clue.startCol] = clue.number.toString()
-      }
-
-      // Place the letters
+    const placeWord = (
+      answer: string,
+      row: number,
+      col: number,
+      direction: "across" | "down",
+      number: number
+    ): boolean => {
+      // Validate placement before modifying grid
       for (let i = 0; i < answer.length; i++) {
-        const col = clue.startCol + i
-        if (col < 10 && grid[clue.startRow]) {
-          // If it's the first letter and no number is placed, place the number
-          if (i === 0 && grid[clue.startRow][col] === "") {
-            grid[clue.startRow][col] = clue.number.toString()
-          } else if (i > 0) {
-            // Place the letter (not the first position which has the number)
-            grid[clue.startRow][col] = answer[i]
-          }
+        const r = direction === "across" ? row : row + i
+        const c = direction === "across" ? col + i : col
+
+        if (r >= 10 || c >= 10) {
+          console.error(`Invalid placement for ${answer} at (${row},${col}) ${direction}: Out of bounds`)
+          return false
+        }
+
+        const current = grid[r][c]
+        if (current === "") {
+          continue
+        } else if (/^\d+$/.test(current)) {
+          continue
+        } else if (current !== answer[i]) {
+          console.error(`Conflict at (${r},${c}): grid='${current}' vs word='${answer[i]}'`)
+          return false
         }
       }
-    })
 
-    // Place down words
-    clues.down.forEach((clue: any) => {
-      const answer = clue.answer.toUpperCase()
-      console.log(`📝 Placing DOWN word "${answer}" at row ${clue.startRow}, col ${clue.startCol}`)
-
-      // Place the number in the first cell if it's empty
-      if (grid[clue.startRow] && grid[clue.startRow][clue.startCol] === "") {
-        grid[clue.startRow][clue.startCol] = clue.number.toString()
-      }
-
-      // Place the letters
+      // Place the word if validation passes
       for (let i = 0; i < answer.length; i++) {
-        const row = clue.startRow + i
-        if (row < 10 && grid[row]) {
-          // If it's the first letter and no number is placed, place the number
-          if (i === 0 && grid[row][clue.startCol] === "") {
-            grid[row][clue.startCol] = clue.number.toString()
-          } else if (i > 0) {
-            // Place the letter (not the first position which has the number)
-            grid[row][clue.startCol] = answer[i]
-          }
+        const r = direction === "across" ? row : row + i
+        const c = direction === "across" ? col + i : col
+
+        if (i === 0 && grid[r][c] === "") {
+          grid[r][c] = number.toString()
+        } else {
+          grid[r][c] = answer[i]
         }
       }
-    })
+      return true
+    }
+
+    // Place across clues
+    for (const clue of clues.across) {
+      console.log(`📝 Placing ACROSS word "${clue.answer}" at row ${clue.startRow}, col ${clue.startCol}`)
+      if (!placeWord(clue.answer, clue.startRow, clue.startCol, "across", clue.number)) {
+        console.error(`Failed to place across clue ${clue.number}: ${clue.answer}`)
+        return grid
+      }
+    }
+
+    // Place down clues
+    for (const clue of clues.down) {
+      console.log(`📝 Placing DOWN word "${clue.answer}" at row ${clue.startRow}, col ${clue.startCol}`)
+      if (!placeWord(clue.answer, clue.startRow, clue.startCol, "down", clue.number)) {
+        console.error(`Failed to place down clue ${clue.number}: ${clue.answer}`)
+        return grid
+      }
+    }
 
     console.log("🎯 Final built grid:", grid)
     return grid
@@ -190,6 +200,7 @@ export class CognitiveAPI {
       - startRow and startCol should be valid positions (0-9)
       - Words should fit within a 10x10 grid
       - Make clues challenging but fair
+      - Ensure overlapping letters match exactly at intersections
       
       Do NOT include a grid array - I will build it from the clues.`
 
@@ -214,9 +225,35 @@ export class CognitiveAPI {
           // Build the grid from the clues
           const grid = this.buildCrosswordGrid(puzzleData.clues)
 
+          // Validate puzzle for overlapping letters
+          const hasConflicts = grid.some((row, r) =>
+            row.some((cell, c) => {
+              let expectedLetters: string[] = []
+              for (const direction of ["across", "down"] as const) {
+                puzzleData.clues[direction].forEach((clue: any) => {
+                  if (direction === "across") {
+                    if (r === clue.startRow && c >= clue.startCol && c < clue.startCol + clue.answer.length) {
+                      expectedLetters.push(clue.answer[c - clue.startCol])
+                    }
+                  } else {
+                    if (c === clue.startCol && r >= clue.startRow && r < clue.startRow + clue.answer.length) {
+                      expectedLetters.push(clue.answer[r - clue.startRow])
+                    }
+                  }
+                })
+              }
+              return expectedLetters.length > 1 && !expectedLetters.every((letter) => letter === expectedLetters[0])
+            })
+          )
+
+          if (hasConflicts) {
+            console.error("Invalid puzzle: Overlapping letters do not match.")
+            return this.getMockCrossword(theme, difficulty)
+          }
+
           const crossword: CrosswordPuzzle = {
             id: `crossword_${Date.now()}`,
-            grid: grid,
+            grid,
             clues: puzzleData.clues,
             difficulty: puzzleData.difficulty,
             theme: puzzleData.theme,
@@ -226,7 +263,6 @@ export class CognitiveAPI {
         } catch (parseError) {
           console.error("❌ JSON parsing failed:", parseError)
           console.log("🔄 Falling back to mock data")
-          // Fallback to mock data if parsing fails
           return this.getMockCrossword(theme, difficulty)
         }
       }
@@ -246,12 +282,12 @@ export class CognitiveAPI {
     const mockCrossword: CrosswordPuzzle = {
       id: `crossword_${Date.now()}`,
       grid: [
-        ["1", "C", "A", "T", "", "", "", "", "", ""],
-        ["", "", "", "2", "", "", "", "", "", ""],
-        ["", "", "", "R", "", "", "", "", "", ""],
-        ["3", "D", "O", "G", "", "", "", "", "", ""],
+        ["1", "L", "2", "O", "", "", "", "", "", ""],
+        ["", "", "W", "", "", "", "", "", "", ""],
+        ["", "", "L", "", "", "", "", "", "", ""],
+        ["3", "C", "A", "T", "", "", "", "", "", ""],
         ["", "", "", "", "", "", "", "", "", ""],
-        ["4", "B", "I", "R", "D", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", "", ""],
         ["", "", "", "", "", "", "", "", "", ""],
         ["", "", "", "", "", "", "", "", "", ""],
         ["", "", "", "", "", "", "", "", "", ""],
@@ -259,11 +295,12 @@ export class CognitiveAPI {
       ],
       clues: {
         across: [
-          { number: 1, clue: "Feline pet", answer: "CAT", startRow: 0, startCol: 1 },
-          { number: 3, clue: "Man's best friend", answer: "DOG", startRow: 3, startCol: 1 },
-          { number: 4, clue: "Flying animal with feathers", answer: "BIRD", startRow: 5, startCol: 1 },
+          { number: 1, clue: "Wild cat with a mane", answer: "LION", startRow: 0, startCol: 1 },
+          { number: 3, clue: "Feline pet", answer: "CAT", startRow: 3, startCol: 1 },
         ],
-        down: [{ number: 2, clue: "Grows from seeds", answer: "TREE", startRow: 1, startCol: 3 }],
+        down: [
+          { number: 2, clue: "Night bird", answer: "OWL", startRow: 0, startCol: 2 },
+        ],
       },
       difficulty,
       theme,
@@ -462,7 +499,6 @@ export class CognitiveAPI {
   // Track user progress
   async trackProgress(progressData: ProgressData): Promise<APIResponse<boolean>> {
     try {
-      // In a real implementation, this would save to a database
       console.log("Progress tracked:", progressData)
       return { success: true, data: true }
     } catch (error) {
@@ -522,7 +558,7 @@ export class CognitiveAPI {
   }
 }
 
-// Export a default instance (you can configure this with your actual API key)
+// Export a default instance
 export const cognitiveAPI = new CognitiveAPI(
   process.env.NEXT_PUBLIC_CHATANYWHERE_API_KEY || "demo-key",
   "https://api.chatanywhere.tech/v1",
