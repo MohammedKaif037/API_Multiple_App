@@ -469,20 +469,17 @@ export default function CrosswordGame() {
             </div>
           </div>
 
-           
+          {gameCompleted && (
+            <div className="mt-6 text-center">
+              <Trophy className="mx-auto text-yellow-500" size={40} />
+              <h2 className="text-2xl font-bold mt-2">🎉 Congratulations! You completed the puzzle!</h2>
+              <p className="text-sm mt-1">Final Score: {score} | Time: {formatTime(timeElapsed)}</p>
+            </div>
+          )}
 
-            {gameCompleted && (
-              <div className="mt-6 text-center">
-                <Trophy className="mx-auto text-yellow-500" size={40} />
-                <h2 className="text-2xl font-bold mt-2">🎉 Congratulations! You completed the puzzle!</h2>
-                <p className="text-sm mt-1">Final Score: {score} | Time: {formatTime(timeElapsed)}</p>
-              </div>
-            )}
-
-            <Link href="/games" className="mt-6 inline-flex items-center text-blue-600 hover:underline text-sm">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Back to Games
-            </Link>
-          </div>
+          <Link href="/games" className="mt-6 inline-flex items-center text-blue-600 hover:underline text-sm">
+            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Games
+          </Link>
         </div>
       )}
     </div>
