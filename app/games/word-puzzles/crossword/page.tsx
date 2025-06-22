@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Check, RotateCcw, Lightbulb, Trophy } from "lucide-react"
+import Link from "next/link"
 
 // Mock API for demonstration - replace with your actual API
 const mockAPI = {
