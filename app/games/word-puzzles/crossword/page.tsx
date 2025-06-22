@@ -147,59 +147,27 @@ export default function CrosswordGame() {
   }
 
   const startGame = async () => {
-    setLoading(true)
-    try {
-      const response = await cognitiveAPI.generateCrossword(theme, difficulty)
-      if (response.success && response.data) {
-        const grid = buildGridFromClues(response.data.clues)
-        // Validate puzzle for overlapping letters
-        const hasConflicts = grid.some((row, r) =>
-          row.some((cell, c) => {
-            let expectedLetters: string[] = []
-            for (const direction of ["across", "down"] as ClueDirection[]) {
-              response.data.clues[direction].forEach((clue) => {
-                if (direction === "across") {
-                  if (r === clue.startRow && c >= clue.startCol && c < clue.startCol + clue.answer.length) {
-                    expectedLetters.push(clue.answer[c - clue.startCol])
-                  }
-                } else {
-                  if (c === clue.startCol && r >= clue.startRow && r < clue.startRow + clue.answer.length) {
-                    expectedLetters.push(clue.answer[r - clue.startRow])
-                  }
-                }
-              })
-            }
-            return expectedLetters.length > 1 && !expectedLetters.every((letter) => letter === expectedLetters[0])
-          })
-        )
-
-        if (hasConflicts) {
-          console.error("Invalid puzzle: Overlapping letters do not match.")
-          alert("Failed to generate a valid puzzle. Please try again.")
-          return
-        }
-
-        setPuzzle({
-          ...response.data,
-          id: "api_generated_puzzle",
-          grid,
-        })
-        setGameStarted(true)
-        setTimeElapsed(0)
-        setScore(0)
-        setUserAnswers({})
-        setGameCompleted(false)
-        setHintsUsed(0)
-        setCorrectCells({})
-        clearProgress()
-      }
-    } catch (error) {
-      console.error("Failed to generate puzzle:", error)
-      alert("Error generating puzzle. Please try again.")
-    } finally {
-      setLoading(false)
+  setLoading(true)
+  try {
+    const response = await cognitiveAPI.generateCrossword(theme, difficulty)
+    if (response.success && response.data) {
+      setPuzzle(response.data)
+      setGameStarted(true)
+      setTimeElapsed(0)
+      setScore(0)
+      setUserAnswers({})
+      setGameCompleted(false)
+      setHintsUsed(0)
+      setCorrectCells({})
+      clearProgress()
     }
+  } catch (error) {
+    console.error("Failed to generate puzzle:", error)
+    alert("Error generating puzzle. Please try again.")
+  } finally {
+    setLoading(false)
   }
+}
 
   const handleCellInput = (row: number, col: number, value: string) => {
     const key = `${row}-${col}`
