@@ -99,6 +99,8 @@ export interface Achievement {
 import OpenAI from "openai"
 
 // Main API service class
+// Fixed cognitive-api.ts - Focus on the crossword generation part
+
 export class CognitiveAPI {
   private client: OpenAI
 
@@ -106,11 +108,11 @@ export class CognitiveAPI {
     this.client = new OpenAI({
       apiKey: apiKey,
       baseURL: baseURL,
-      dangerouslyAllowBrowser: true, // Allow browser usage
+      dangerouslyAllowBrowser: true,
     })
   }
 
-  // Helper function to build crossword grid from clues
+  // Improved helper function to build crossword grid
   private buildCrosswordGrid(clues: CrosswordPuzzle["clues"]): string[][] {
     console.log("🔧 Building crossword grid from clues:", clues)
 
@@ -126,130 +128,181 @@ export class CognitiveAPI {
       direction: "across" | "down",
       number: number
     ): boolean => {
-      // Validate placement before modifying grid
+      console.log(`🔍 Trying to place "${answer}" (${direction}) at (${row},${col})`)
+      
+      // Check if word fits in grid
+      const endRow = direction === "across" ? row : row + answer.length - 1
+      const endCol = direction === "across" ? col + answer.length - 1 : col
+
+      if (endRow >= 10 || endCol >= 10 || row < 0 || col < 0) {
+        console.error(`❌ Word "${answer}" doesn't fit: would end at (${endRow},${endCol})`)
+        return false
+      }
+
+      // Check for conflicts with existing letters
       for (let i = 0; i < answer.length; i++) {
         const r = direction === "across" ? row : row + i
         const c = direction === "across" ? col + i : col
+        const currentCell = grid[r][c]
+        const newLetter = answer[i]
 
-        if (r >= 10 || c >= 10) {
-          console.error(`Invalid placement for ${answer} at (${row},${col}) ${direction}: Out of bounds`)
-          return false
+        // Skip empty cells and number markers
+        if (currentCell === "" || /^\d+$/.test(currentCell)) {
+          continue
         }
-
-        const current = grid[r][c]
-        if (current === "") {
-          continue
-        } else if (/^\d+$/.test(current)) {
-          continue
-        } else if (current !== answer[i]) {
-          console.error(`Conflict at (${r},${c}): grid='${current}' vs word='${answer[i]}'`)
+        
+        // Check for letter conflicts
+        if (currentCell !== newLetter) {
+          console.error(`❌ Letter conflict at (${r},${c}): existing="${currentCell}" vs new="${newLetter}"`)
           return false
         }
       }
 
-      // Place the word if validation passes
+      // Place the word
+      console.log(`✅ Placing "${answer}" successfully`)
       for (let i = 0; i < answer.length; i++) {
         const r = direction === "across" ? row : row + i
         const c = direction === "across" ? col + i : col
 
+        // Place number marker only at the start if cell is empty
         if (i === 0 && grid[r][c] === "") {
           grid[r][c] = number.toString()
-        } else {
+        } else if (grid[r][c] === "" || /^\d+$/.test(grid[r][c])) {
+          // Replace empty cell or number with letter
           grid[r][c] = answer[i]
         }
+        // If cell already has the same letter, leave it as is
       }
       return true
     }
 
-    // Place across clues
+    // Place across words first
+    let placementSuccess = true
     for (const clue of clues.across) {
-      console.log(`📝 Placing ACROSS word "${clue.answer}" at row ${clue.startRow}, col ${clue.startCol}`)
       if (!placeWord(clue.answer, clue.startRow, clue.startCol, "across", clue.number)) {
-        console.error(`Failed to place across clue ${clue.number}: ${clue.answer}`)
-        return grid
+        console.error(`❌ Failed to place across word: "${clue.answer}"`)
+        placementSuccess = false
       }
     }
 
-    // Place down clues
+    // Place down words
     for (const clue of clues.down) {
-      console.log(`📝 Placing DOWN word "${clue.answer}" at row ${clue.startRow}, col ${clue.startCol}`)
       if (!placeWord(clue.answer, clue.startRow, clue.startCol, "down", clue.number)) {
-        console.error(`Failed to place down clue ${clue.number}: ${clue.answer}`)
-        return grid
+        console.error(`❌ Failed to place down word: "${clue.answer}"`)
+        placementSuccess = false
       }
     }
 
-    console.log("🎯 Final built grid:", grid)
+    if (!placementSuccess) {
+      console.log("⚠️ Some words couldn't be placed, using mock data")
+      return this.getMockGrid()
+    }
+
+    console.log("🎯 Final grid built successfully:", grid)
     return grid
   }
 
-  // Generate crossword puzzle using OpenAI
+  private getMockGrid(): string[][] {
+    return [
+      ["1", "S", "2", "C", "I", "", "", "", "", ""],
+      ["", "", "T", "", "", "", "", "", "", ""],
+      ["", "", "A", "", "", "", "", "", "", ""],
+      ["3", "L", "A", "B", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", "", "", ""],
+    ]
+  }
+
+  // Improved crossword generation with better prompting
   async generateCrossword(theme: string, difficulty: number): Promise<APIResponse<CrosswordPuzzle>> {
     try {
       console.log("🎯 Generating crossword with:", { theme, difficulty })
 
-      const prompt = `Generate a ${difficulty === 1 ? "easy" : difficulty === 2 ? "medium" : "hard"} crossword puzzle with theme "${theme}". 
-      Return a JSON object with:
-      - clues: {across: [{number, clue, answer, startRow, startCol}], down: [{number, clue, answer, startRow, startCol}]}
-      - difficulty: ${difficulty}
-      - theme: "${theme}"
-      
-      Make sure:
-      - Include 5-8 words total for easy difficulty
-      - Answers should be uppercase
-      - startRow and startCol should be valid positions (0-9)
-      - Words should fit within a 10x10 grid
-      - Make clues challenging but fair
-      - Ensure overlapping letters match exactly at intersections
-      
-      Do NOT include a grid array - I will build it from the clues.`
+      const wordCount = difficulty === 1 ? "4-5" : difficulty === 2 ? "6-7" : "8-9"
+      const maxLength = difficulty === 1 ? 6 : difficulty === 2 ? 8 : 10
 
-      console.log("📤 Sending prompt to ChatAnywhere API:", prompt)
+      const prompt = `Create a crossword puzzle for theme "${theme}" with ${difficulty === 1 ? "easy" : difficulty === 2 ? "medium" : "hard"} difficulty.
+
+REQUIREMENTS:
+- Include ${wordCount} words total
+- Each word should be ${difficulty === 1 ? "3-6" : difficulty === 2 ? "4-8" : "5-10"} letters long
+- Grid size is 10x10 (positions 0-9)
+- Words must fit completely within the grid
+- At least 2 words should intersect (share a common letter)
+
+Return ONLY a JSON object with this exact structure:
+{
+  "clues": {
+    "across": [
+      {"number": 1, "clue": "clue text", "answer": "ANSWER", "startRow": 0, "startCol": 0}
+    ],
+    "down": [
+      {"number": 2, "clue": "clue text", "answer": "ANSWER", "startRow": 0, "startCol": 0}
+    ]
+  },
+  "difficulty": ${difficulty},
+  "theme": "${theme}"
+}
+
+VALIDATION RULES:
+- All answers must be uppercase
+- startRow + word length ≤ 10 for down words
+- startCol + word length ≤ 10 for across words
+- Intersecting words must have matching letters at intersection points
+- Number clues sequentially starting from 1
+
+Theme: ${theme}`
+
+      console.log("📤 Sending improved prompt to API...")
 
       const response = await this.client.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
+        temperature: 0.5, // Lower temperature for more consistent results
+        max_tokens: 1000,
       })
 
-      console.log("📥 Raw API response:", response)
-      console.log("📝 Response content:", response.choices[0]?.message?.content)
-
+      console.log("📥 API Response received")
       const content = response.choices[0]?.message?.content
+
       if (content) {
         try {
-          console.log("🔄 Attempting to parse JSON content...")
-          const puzzleData = JSON.parse(content)
+          console.log("📝 Raw content:", content)
+          
+          // Clean up the response (remove any markdown formatting)
+          const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim()
+          console.log("🧹 Cleaned content:", cleanContent)
+          
+          const puzzleData = JSON.parse(cleanContent)
           console.log("✅ Parsed puzzle data:", puzzleData)
 
-          // Build the grid from the clues
-          const grid = this.buildCrosswordGrid(puzzleData.clues)
+          // Validate the puzzle structure
+          if (!puzzleData.clues || !puzzleData.clues.across || !puzzleData.clues.down) {
+            throw new Error("Invalid puzzle structure")
+          }
 
-          // Validate puzzle for overlapping letters
-          const hasConflicts = grid.some((row, r) =>
-            row.some((cell, c) => {
-              let expectedLetters: string[] = []
-              for (const direction of ["across", "down"] as const) {
-                puzzleData.clues[direction].forEach((clue: any) => {
-                  if (direction === "across") {
-                    if (r === clue.startRow && c >= clue.startCol && c < clue.startCol + clue.answer.length) {
-                      expectedLetters.push(clue.answer[c - clue.startCol])
-                    }
-                  } else {
-                    if (c === clue.startCol && r >= clue.startRow && r < clue.startRow + clue.answer.length) {
-                      expectedLetters.push(clue.answer[r - clue.startRow])
-                    }
-                  }
-                })
-              }
-              return expectedLetters.length > 1 && !expectedLetters.every((letter) => letter === expectedLetters[0])
+          // Validate word placement bounds
+          const isValidPlacement = (words: any[], direction: "across" | "down") => {
+            return words.every(word => {
+              const maxRow = direction === "across" ? 9 : 9 - word.answer.length + 1
+              const maxCol = direction === "across" ? 9 - word.answer.length + 1 : 9
+              return word.startRow >= 0 && word.startRow <= maxRow && 
+                     word.startCol >= 0 && word.startCol <= maxCol
             })
-          )
+          }
 
-          if (hasConflicts) {
-            console.error("Invalid puzzle: Overlapping letters do not match.")
+          if (!isValidPlacement(puzzleData.clues.across, "across") || 
+              !isValidPlacement(puzzleData.clues.down, "down")) {
+            console.error("❌ Invalid word placement detected, using mock data")
             return this.getMockCrossword(theme, difficulty)
           }
+
+          // Build the grid
+          const grid = this.buildCrosswordGrid(puzzleData.clues)
 
           const crossword: CrosswordPuzzle = {
             id: `crossword_${Date.now()}`,
@@ -258,8 +311,10 @@ export class CognitiveAPI {
             difficulty: puzzleData.difficulty,
             theme: puzzleData.theme,
           }
-          console.log("🎮 Final crossword object:", crossword)
+
+          console.log("🎮 Final crossword generated successfully:", crossword)
           return { success: true, data: crossword }
+
         } catch (parseError) {
           console.error("❌ JSON parsing failed:", parseError)
           console.log("🔄 Falling back to mock data")
@@ -269,6 +324,7 @@ export class CognitiveAPI {
 
       console.log("⚠️ No content in response, using mock data")
       return this.getMockCrossword(theme, difficulty)
+
     } catch (error) {
       console.error("💥 API call failed:", error)
       console.log("🔄 Using mock data due to error")
@@ -279,29 +335,20 @@ export class CognitiveAPI {
   private getMockCrossword(theme: string, difficulty: number): APIResponse<CrosswordPuzzle> {
     console.log("🎲 Generating mock crossword with:", { theme, difficulty })
 
+    const mockClues = {
+      across: [
+        { number: 1, clue: `${theme} related word`, answer: "STAR", startRow: 1, startCol: 0 },
+        { number: 3, clue: `Another ${theme} term`, answer: "LAB", startRow: 3, startCol: 1 },
+      ],
+      down: [
+        { number: 2, clue: `${theme} concept`, answer: "ATOM", startRow: 0, startCol: 2 },
+      ],
+    }
+
     const mockCrossword: CrosswordPuzzle = {
       id: `crossword_${Date.now()}`,
-      grid: [
-        ["1", "L", "2", "O", "", "", "", "", "", ""],
-        ["", "", "W", "", "", "", "", "", "", ""],
-        ["", "", "L", "", "", "", "", "", "", ""],
-        ["3", "C", "A", "T", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", "", "", "", ""],
-      ],
-      clues: {
-        across: [
-          { number: 1, clue: "Wild cat with a mane", answer: "LION", startRow: 0, startCol: 1 },
-          { number: 3, clue: "Feline pet", answer: "CAT", startRow: 3, startCol: 1 },
-        ],
-        down: [
-          { number: 2, clue: "Night bird", answer: "OWL", startRow: 0, startCol: 2 },
-        ],
-      },
+      grid: this.buildCrosswordGrid(mockClues),
+      clues: mockClues,
       difficulty,
       theme,
     }
